@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "16032415528",
+    "firebase_url": "https://kungadi-53b2a-default-rtdb.firebaseio.com",
+    "project_id": "kungadi-53b2a",
+    "storage_bucket": "kungadi-53b2a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:16032415528:android:7fbf858eae37d9bd161a1d",
+        "android_client_info": {
+          "package_name": "com.example.kun_gadi"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB65mFz5VTJfPAtaSPM5ze25d5lod4xKjw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

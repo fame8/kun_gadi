@@ -1,0 +1,169 @@
+{
+  "stops": {
+    "Badegaun": { "name": "Badegaun", "lat": 27.605, "lng": 85.355 },
+    "Balaju": { "name": "Balaju", "lat": 27.734, "lng": 85.305 },
+    "Basundhara": { "name": "Basundhara", "lat": 27.727, "lng": 85.317 },
+    "Bafal": { "name": "Bafal", "lat": 27.6925, "lng": 85.273 },
+    "Banasthali": { "name": "Banasthali", "lat": 27.700, "lng": 85.286 },
+    "Bhadrakali": { "name": "Bhadrakali", "lat": 27.703, "lng": 85.318 },
+    "Bhaisepati": { "name": "Bhaisepati", "lat": 27.6531, "lng": 85.3023 },
+    "Budhanilkantha": { "name": "Budhanilkantha", "lat": 27.780, "lng": 85.366 },
+    "Bungamati": { "name": "Bungamati", "lat": 27.620, "lng": 85.310 },
+
+    "Chapali": { "name": "Chapali", "lat": 27.768, "lng": 85.347 },
+    "Deuwa_Chowk": { "name": "Deuwa Chowk", "lat": 27.7665, "lng": 85.345 },
+
+    "Ekantakunna": { "name": "Ekantakunna", "lat": 27.676, "lng": 85.299 },
+    "Gangalal_Hospital": { "name": "Gangalal Hospital", "lat": 27.7422, "lng": 85.3145 },
+    "Godawari": { "name": "Godawari", "lat": 27.593, "lng": 85.330 },
+    "Golfutar": { "name": "Golfutar", "lat": 27.759, "lng": 85.336 },
+    "Gongabu_Bus_Park": { "name": "Gongabu Bus Park", "lat": 27.7425, "lng": 85.3145 },
+    "Gwarko": { "name": "Gwarko Chowk", "lat": 27.6665, "lng": 85.334 },
+
+    "Hadegaun": { "name": "Hadegaun", "lat": 27.600, "lng": 85.350 },
+    "Harihar_Bhawan": { "name": "Harihar Bhawan", "lat": 27.684, "lng": 85.321 },
+    "Harishidhi": { "name": "Harishidhi", "lat": 27.638, "lng": 85.335 },
+    "Hattiban": { "name": "Hattiban", "lat": 27.632, "lng": 85.330 },
+    "Hattigauda": { "name": "Hattigauda", "lat": 27.751, "lng": 85.333 },
+
+    "Imadol": { "name": "Imadol", "lat": 27.653, "lng": 85.338 },
+    "Imadole": { "name": "Imadole", "lat": 27.653, "lng": 85.338 },
+
+    "Jamal": { "name": "Jamal", "lat": 27.7102, "lng": 85.3115 },
+    "Jawalakhel": { "name": "Jawalakhel", "lat": 27.6677, "lng": 85.3208 },
+
+    "Kalanki": { "name": "Kalanki", "lat": 27.694, "lng": 85.282 },
+    "Kalimati": { "name": "Kalimati", "lat": 27.6945, "lng": 85.299 },
+
+    "Kamal_Pokhari": { "name": "Kamal Pokhari", "lat": 27.715, "lng": 85.318 },
+
+    "Khumaltar": { "name": "Khumaltar", "lat": 27.660, "lng": 85.330 },
+    "Krishna_Mandir": { "name": "Krishna Mandir", "lat": 27.650, "lng": 85.340 },
+    "Krishna_Mandir_Chowk": { "name": "Krishna Mandir Chowk", "lat": 27.651, "lng": 85.341 },
+
+    "Kumaripati": { "name": "Kumaripati", "lat": 27.6725, "lng": 85.3244 },
+    "Kupondole": { "name": "Kupondole", "lat": 27.6864, "lng": 85.3095 },
+
+    "Lagankhel": { "name": "Lagankhel", "lat": 27.6679, "lng": 85.3225 },
+
+    "Lainchaur": { "name": "Lainchaur", "lat": 27.7092, "lng": 85.3123 },
+    "Lazimpat": { "name": "Lazimpat", "lat": 27.7228, "lng": 85.316 },
+
+    "Maitighar": { "name": "Maitighar", "lat": 27.7005, "lng": 85.321 },
+    "Mangal_Bazar": { "name": "Mangal Bazar", "lat": 27.673, "lng": 85.325 },
+
+    "NAC": { "name": "NAC", "lat": 27.7095, "lng": 85.312 },
+    "Narayan_Gopal_Chowk": { "name": "Narayan Gopal Chowk", "lat": 27.743, "lng": 85.3138 },
+
+    "Naya_Baneshwor": { "name": "Naya Baneshwor", "lat": 27.688, "lng": 85.335 },
+    "Neuro_Hospital": { "name": "Neuro Hospital", "lat": 27.7442, "lng": 85.3175 },
+
+    "Panipokhari": { "name": "Panipokhari", "lat": 27.725, "lng": 85.312 },
+    "Pulchowk": { "name": "Pulchowk", "lat": 27.6826, "lng": 85.3188 },
+
+    "Ratnapark": { "name": "Ratnapark", "lat": 27.707, "lng": 85.314 },
+    "Purano_Buspark": { "name": "Purano Buspark", "lat": 27.705, "lng": 85.312 },
+
+    "Samakhusi": { "name": "Samakhusi", "lat": 27.7273, "lng": 85.3175 },
+    "Satdobato": { "name": "Satdobato", "lat": 27.6585, "lng": 85.3245 },
+
+    "Singhadurbar": { "name": "Singhadurbar", "lat": 27.6995, "lng": 85.3175 },
+    "Sinamangal": { "name": "Sinamangal", "lat": 27.696, "lng": 85.357 },
+
+    "Sundhara": { "name": "Sundhara", "lat": 27.704, "lng": 85.313 },
+
+    "TIA": { "name": "Tribhuvan International Airport", "lat": 27.697, "lng": 85.359 },
+
+    "Thankot": { "name": "Thankot", "lat": 27.691, "lng": 85.209 },
+
+    "Tinkune": { "name": "Tinkune", "lat": 27.6885, "lng": 85.345 },
+    "Tinkuney": { "name": "Tinkuney", "lat": 27.6885, "lng": 85.345 },
+
+    "Tripureshwor": { "name": "Tripureshwor", "lat": 27.7068, "lng": 85.315 }
+  },
+
+  "routes": {
+    "route_1": {
+      "name":"Lagankhel- Gongabu",
+      "vehicleType": "sajha",
+      "stopIds": [
+        "Lagankhel","Kumaripati","Jawalakhel","Pulchowk","Harihar_Bhawan",
+        "Kupondole","Tripureshwor","NAC","Jamal","Lainchaur",
+        "Lazimpat","Panipokhari","Basundhara","Samakhusi","Gongabu_Bus_Park"
+      ]
+    },
+
+    "route_2": {
+        "name":"Lagankhel- Budhanilkantha",
+      "vehicleType": "sajha",
+      "stopIds": [
+        "Lagankhel","Kumaripati","Jawalakhel","Pulchowk","Harihar_Bhawan",
+        "Kupondole","Tripureshwor","NAC","Jamal",
+        "Narayan_Gopal_Chowk","Gangalal_Hospital","Neuro_Hospital",
+        "Golfutar","Hattigauda","Chapali","Deuwa_Chowk","Budhanilkantha"
+      ]
+    },
+
+    "route_3": {
+        "name":"Goddawari-Ratnapark",
+      "vehicleType": "sajha",
+      "stopIds": [
+        "Godawari","Hadegaun","Badegaun","Harishidhi","Hattiban",
+        "Khumaltar","Satdobato","Lagankhel","Kumaripati",
+        "Jawalakhel","Pulchowk","Harihar_Bhawan","Kupondole",
+        "Tripureshwor","NAC","Ratnapark"
+      ]
+    },
+
+    "route_4": {
+        "name":"Thankot- TIA",
+      "vehicleType": "sajha",
+      "stopIds": [
+        "Thankot","Kalanki","Kalimati","Tripureshwor","NAC",
+        "Ratnapark","Singhadurbar","Maitighar",
+        "Naya_Baneshwor","Tinkune","Sinamangal","TIA"
+      ]
+    },
+
+    "route_5": {
+        "name":"Bungamati- Jamal",
+      "vehicleType": "sajha",
+      "stopIds": [
+        "Bungamati","Bhaisepati","Ekantakunna","Lagankhel",
+        "Jawalakhel","Pulchowk","Kupondole",
+        "Bhadrakali","NAC","Jamal"
+      ]
+    },
+
+    "route_6": {
+        "name":"Imadol- Sundhara",
+      "vehicleType": "tempo",
+      "stopIds": [
+        "Imadol","Kamal_Pokhari","Krishna_Mandir_Chowk",
+        "Gwarko","Mangal_Bazar","Lagankhel",
+        "Kumaripati","Jawalakhel","Pulchowk",
+        "Kupondole","Tripureshwor","Ratnapark",
+        "Purano_Buspark","Bhadrakali","Sundhara"
+      ]
+    },
+
+    "route_7": {
+        "name":"Kumaripati-Lagankhel",
+      "vehicleType": "tempo",
+      "stopIds": [
+        "Kumaripati","Jawalakhel","Pulchowk","Harihar_Bhawan",
+        "Kupondole","Maitighar","Naya_Baneshwor",
+        "Tinkuney","Gwarko","Satdobato","Lagankhel"
+      ]
+    },
+
+    "route_8": {
+        "name":"Kumaripati- Bhadrakali",
+      "vehicleType": "tempo",
+      "stopIds": [
+        "Kumaripati","Jawalakhel","Pulchowk",
+        "Kupondole","Kalimati","Tripureshwor","Bhadrakali"
+      ]
+    }
+  }
+}

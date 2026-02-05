@@ -1,0 +1,16 @@
+{
+  "stops": {
+    "kalanki": {
+      "name": "Kalanki",
+      "lat": 27.6939,
+      "lng": 85.2813
+    }
+  },
+  "routes": {
+    "sajha_1": {
+      "name": "Kalanki – Ratna Park",
+      "vehicle": "sajha",
+      "stop_ids": ["kalanki", "jamal"]
+    }
+  }
+}
