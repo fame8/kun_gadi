@@ -10,14 +10,6 @@ import '../services/route_service.dart';
 
 const String GOOGLE_API_KEY = 'AIzaSyBVEoTUtT7P_OA2hRE-T-YbcOJtQLuprb4';
 
-class WalkingResult {
-  final double distanceMeters;
-  final int durationSeconds;
-  final List<LatLng> points;
-
-  WalkingResult(this.distanceMeters, this.durationSeconds, this.points);
-}
-
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
 
@@ -37,8 +29,17 @@ class _MapScreenState extends State<MapScreen> {
   final Set<Polyline> _polylines = {};
   final Set<Marker> _markers = {};
 
-  StopModel? _activeDestination;
+  List<StopModel> _activeDestinations = [];
   LatLng? _currentLocation;
+
+  String? _bestRouteId;
+  RouteModel? _walkRoute;
+  int? _walkDurationMinutes;
+
+  Map<String, Map<String, int>> _routeFares = {};
+
+  // New: sorting option
+  String _sortOption = 'Distance'; // default
 
   @override
   void initState() {
@@ -65,12 +66,9 @@ class _MapScreenState extends State<MapScreen> {
     _currentLocation = LatLng(pos.latitude, pos.longitude);
   }
 
-  // ================= POLYLINE DECODER =================
-
   List<LatLng> _decodePolyline(String encoded) {
     List<LatLng> poly = [];
     int index = 0, lat = 0, lng = 0;
-
     while (index < encoded.length) {
       int b, shift = 0, result = 0;
       do {
@@ -79,7 +77,6 @@ class _MapScreenState extends State<MapScreen> {
         shift += 5;
       } while (b >= 0x20);
       lat += ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
-
       shift = 0;
       result = 0;
       do {
@@ -88,36 +85,10 @@ class _MapScreenState extends State<MapScreen> {
         shift += 5;
       } while (b >= 0x20);
       lng += ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
-
       poly.add(LatLng(lat / 1E5, lng / 1E5));
     }
     return poly;
   }
-
-  // ================= WALKING =================
-
-  Future<WalkingResult?> _getWalkingRoute(
-    LatLng origin,
-    LatLng destination,
-  ) async {
-    final url =
-        'https://maps.googleapis.com/maps/api/directions/json?origin=${origin.latitude},${origin.longitude}&destination=${destination.latitude},${destination.longitude}&mode=walking&key=$GOOGLE_API_KEY';
-
-    final res = await http.get(Uri.parse(url));
-    final data = jsonDecode(res.body);
-
-    if (data['status'] != 'OK') return null;
-
-    final leg = data['routes'][0]['legs'][0];
-
-    return WalkingResult(
-      leg['distance']['value'].toDouble(),
-      leg['duration']['value'],
-      _decodePolyline(data['routes'][0]['overview_polyline']['points']),
-    );
-  }
-
-  // ================= DRIVING =================
 
   Future<List<LatLng>> _getDrivingRoute(
     LatLng origin,
@@ -125,152 +96,254 @@ class _MapScreenState extends State<MapScreen> {
   ) async {
     final url =
         'https://maps.googleapis.com/maps/api/directions/json?origin=${origin.latitude},${origin.longitude}&destination=${destination.latitude},${destination.longitude}&mode=driving&key=$GOOGLE_API_KEY';
-
     final res = await http.get(Uri.parse(url));
     final data = jsonDecode(res.body);
-
     if (data['status'] != 'OK') return [];
-
     return _decodePolyline(data['routes'][0]['overview_polyline']['points']);
   }
 
-  // ================= SEARCH =================
+  Future<WalkingResult?> _getWalkingRoute(
+    LatLng origin,
+    LatLng destination,
+  ) async {
+    final url =
+        'https://maps.googleapis.com/maps/api/directions/json?origin=${origin.latitude},${origin.longitude}&destination=${destination.latitude},${destination.longitude}&mode=walking&key=$GOOGLE_API_KEY';
+    final res = await http.get(Uri.parse(url));
+    final data = jsonDecode(res.body);
+    if (data['status'] != 'OK') return null;
+
+    final leg = data['routes'][0]['legs'][0];
+    return WalkingResult(
+      leg['distance']['value'].toDouble(),
+      leg['duration']['value'],
+      _decodePolyline(data['routes'][0]['overview_polyline']['points']),
+    );
+  }
 
   Future<void> _searchAndRecommend() async {
-    if (_currentLocation == null) return;
+    final parts = _searchController.text
+        .split(',')
+        .map((e) => e.trim())
+        .toList();
+    final List<StopModel> found = [];
+    for (final p in parts) {
+      final s = await _routeService.searchStops(p);
+      if (s.isNotEmpty) found.add(s.first);
+    }
+    if (found.isEmpty) return;
 
-    final stops = await _routeService.searchStops(_searchController.text);
-    if (stops.isEmpty) return;
+    _activeDestinations = found;
 
-    _activeDestination = stops.first;
-
-    final candidates = _routes
-        .where((r) => r.stopIds.contains(stops.first.id))
+    final matchingRoutes = _routes
+        .where((r) => found.every((s) => r.stopIds.contains(s.id)))
         .toList();
 
-    final recommended = await _recommendRoutesWithWalking(candidates, stops);
+    _filteredRoutes = matchingRoutes.isEmpty ? _routes : matchingRoutes;
+
+    await _calculateBestRoute();
+    await _addWalkingOption();
+
+    _routeFares.clear();
+    for (final route in _filteredRoutes) {
+      if (route.id != 'walk') {
+        final stops = await _routeService.getStopsForRoute(route);
+        _routeFares[route.id] = _calculateFare(route, stops);
+      }
+    }
+
+    _sortRoutes(); // sort according to selected option
 
     setState(() {
-      _filteredRoutes = recommended;
       _markers.clear();
-      _markers.add(_createMarker(_activeDestination!, true));
+      for (final d in found) {
+        _markers.add(_createMarker(d, BitmapDescriptor.hueGreen));
+      }
     });
   }
 
-  // ================= ROUTE RANKING =================
+  Future<void> _calculateBestRoute() async {
+    if (_currentLocation == null) return;
 
-  Future<List<RouteModel>> _recommendRoutesWithWalking(
-    List<RouteModel> routes,
-    List<StopModel> destinations,
-  ) async {
-    if (_currentLocation == null) return routes;
+    double bestDistance = double.infinity;
+    String? bestId;
+    Map<String, double> routeDistances = {};
 
-    final scored = <MapEntry<RouteModel, double>>[];
-
-    double nearestStopWalk = double.infinity;
-
-    for (final r in routes) {
+    for (final r in _filteredRoutes) {
       final stops = await _routeService.getStopsForRoute(r);
-      if (stops.isEmpty) continue;
-
-      stops.sort((a, b) {
-        final d1 = Geolocator.distanceBetween(
+      double nearestStopDistance = double.infinity;
+      for (final s in stops) {
+        final d = Geolocator.distanceBetween(
           _currentLocation!.latitude,
           _currentLocation!.longitude,
-          a.lat,
-          a.lng,
+          s.lat,
+          s.lng,
         );
-
-        final d2 = Geolocator.distanceBetween(
-          _currentLocation!.latitude,
-          _currentLocation!.longitude,
-          b.lat,
-          b.lng,
-        );
-
-        return d1.compareTo(d2);
-      });
-
-      final nearest = stops.first;
-
-      final walkToStop = Geolocator.distanceBetween(
-        _currentLocation!.latitude,
-        _currentLocation!.longitude,
-        nearest.lat,
-        nearest.lng,
-      );
-
-      if (walkToStop < nearestStopWalk) nearestStopWalk = walkToStop;
-
-      final destDist = Geolocator.distanceBetween(
-        nearest.lat,
-        nearest.lng,
-        destinations.first.lat,
-        destinations.first.lng,
-      );
-
-      scored.add(MapEntry(r, walkToStop + destDist));
+        if (d < nearestStopDistance) nearestStopDistance = d;
+      }
+      routeDistances[r.id] = nearestStopDistance;
+      if (nearestStopDistance < bestDistance) {
+        bestDistance = nearestStopDistance;
+        bestId = r.id;
+      }
     }
 
+    final walkDist = await _getWalkingDistanceToNearestDestination();
+    if (walkDist != null && walkDist <= bestDistance) {
+      _bestRouteId = 'walk';
+    } else {
+      bestId != null ? _bestRouteId = bestId : null;
+    }
+
+    _sortRoutes(); // apply sorting
+
+    setState(() {});
+  }
+
+  void _sortRoutes() {
+    if (_sortOption == 'Cost') {
+      _filteredRoutes.sort((a, b) {
+        if (a.id == 'walk') return 1;
+        if (b.id == 'walk') return -1;
+        final aCost =
+            _routeFares[a.id]?.values.reduce((x, y) => x < y ? x : y) ?? 9999;
+        final bCost =
+            _routeFares[b.id]?.values.reduce((x, y) => x < y ? x : y) ?? 9999;
+        return aCost.compareTo(bCost);
+      });
+      if (_filteredRoutes.isNotEmpty) _bestRouteId = _filteredRoutes.first.id;
+    } else if (_sortOption == 'Distance') {
+      // distance from current location to nearest stop
+      _filteredRoutes.sort((a, b) {
+        if (_currentLocation == null) return 0;
+        if (a.id == 'walk') return -1;
+        if (b.id == 'walk') return 1;
+        double aDist = 0, bDist = 0;
+        _routeService.getStopsForRoute(a).then((stops) {
+          aDist = stops
+              .map(
+                (s) => Geolocator.distanceBetween(
+                  _currentLocation!.latitude,
+                  _currentLocation!.longitude,
+                  s.lat,
+                  s.lng,
+                ),
+              )
+              .reduce((v, e) => v < e ? v : e);
+        });
+        _routeService.getStopsForRoute(b).then((stops) {
+          bDist = stops
+              .map(
+                (s) => Geolocator.distanceBetween(
+                  _currentLocation!.latitude,
+                  _currentLocation!.longitude,
+                  s.lat,
+                  s.lng,
+                ),
+              )
+              .reduce((v, e) => v < e ? v : e);
+        });
+        return aDist.compareTo(bDist);
+      });
+      if (_filteredRoutes.isNotEmpty) _bestRouteId = _filteredRoutes.first.id;
+    }
+  }
+
+  Future<double?> _getWalkingDistanceToNearestDestination() async {
+    if (_currentLocation == null || _activeDestinations.isEmpty) return null;
     final walk = await _getWalkingRoute(
       _currentLocation!,
-      LatLng(destinations.first.lat, destinations.first.lng),
+      LatLng(_activeDestinations.first.lat, _activeDestinations.first.lng),
     );
+    if (walk != null)
+      _walkDurationMinutes = (walk.durationSeconds / 60).round();
+    return walk?.distanceMeters;
+  }
 
-    if (walk != null) {
-      final walkRoute = RouteModel(
-        id: 'walk',
-        name: 'Walk',
-        vehicle: '🚶 ${(walk.durationSeconds / 60).round()} min',
-        stopIds: [],
+  Future<void> _addWalkingOption() async {
+    _walkRoute = RouteModel(
+      id: 'walk',
+      name: 'Walk',
+      vehicle: _walkDurationMinutes != null
+          ? '🚶 Walk - $_walkDurationMinutes min'
+          : '🚶 Walk',
+      stopIds: [],
+    );
+    if (!_filteredRoutes.any((r) => r.id == 'walk')) {
+      _filteredRoutes.insert(0, _walkRoute!);
+    }
+  }
+
+  Map<String, int> _calculateFare(RouteModel route, List<StopModel> stops) {
+    Map<String, int> fares = {};
+    for (final dest in _activeDestinations) {
+      int index = stops.indexWhere((s) => s.id == dest.id);
+      if (index == -1) continue;
+      double distance = 0;
+      for (int i = 1; i < index; i++) {
+        distance += Geolocator.distanceBetween(
+          stops[i].lat,
+          stops[i].lng,
+          stops[i + 1].lat,
+          stops[i + 1].lng,
+        );
+      }
+      int cost = 20;
+      if (distance > 0) {
+        cost += ((distance / 5000).ceil()) * 5;
+      }
+      fares[dest.name] = cost;
+    }
+    return fares;
+  }
+
+  Future<void> _showRoute(RouteModel route) async {
+    if (_currentLocation == null) return;
+
+    List<StopModel> stops = [];
+    if (route.id != 'walk') stops = await _routeService.getStopsForRoute(route);
+
+    StopModel? nearestStop;
+    double nearestDistance = double.infinity;
+    for (final s in stops) {
+      final d = Geolocator.distanceBetween(
+        _currentLocation!.latitude,
+        _currentLocation!.longitude,
+        s.lat,
+        s.lng,
       );
-
-      scored.add(MapEntry(walkRoute, walk.distanceMeters));
-
-      if (walk.distanceMeters <= nearestStopWalk) {
-        scored.sort((a, b) {
-          if (a.key.id == 'walk') return -1;
-          if (b.key.id == 'walk') return 1;
-          return a.value.compareTo(b.value);
-        });
-
-        return scored.map((e) => e.key).toList();
+      if (d < nearestDistance) {
+        nearestDistance = d;
+        nearestStop = s;
       }
     }
 
-    scored.sort((a, b) => a.value.compareTo(b.value));
-    return scored.map((e) => e.key).toList();
-  }
-
-  // ================= SHOW STOPS =================
-
-  void _showAllStops(List<StopModel> stops) {
-    setState(() {
-      _markers.clear();
-
-      if (_activeDestination != null) {
-        _markers.add(_createMarker(_activeDestination!, true));
-      }
-
-      for (final s in stops) {
-        _markers.add(_createMarker(s, false));
-      }
-    });
-  }
-
-  // ================= SHOW ROUTE =================
-
-  Future<void> _showRoute(RouteModel route) async {
-    if (_currentLocation == null || _activeDestination == null) return;
-
-    if (route.id == 'walk') {
+    if (route.id != 'walk' && nearestStop != null) {
       final walk = await _getWalkingRoute(
         _currentLocation!,
-        LatLng(_activeDestination!.lat, _activeDestination!.lng),
+        LatLng(nearestStop.lat, nearestStop.lng),
       );
+      if (walk != null) {
+        setState(() {
+          _polylines.clear();
+          _polylines.add(
+            Polyline(
+              polylineId: const PolylineId('walkToStop'),
+              points: walk.points,
+              color: Colors.green,
+              width: 5,
+            ),
+          );
+        });
+      }
+    }
 
+    if (route.id == 'walk') {
+      if (_activeDestinations.isEmpty) return;
+      final walk = await _getWalkingRoute(
+        _currentLocation!,
+        LatLng(_activeDestinations.first.lat, _activeDestinations.first.lng),
+      );
       if (walk == null) return;
-
       setState(() {
         _polylines.clear();
         _polylines.add(
@@ -281,28 +354,43 @@ class _MapScreenState extends State<MapScreen> {
             width: 5,
           ),
         );
+        _markers.clear();
+        _markers.add(
+          _createMarker(_activeDestinations.first, BitmapDescriptor.hueGreen),
+        );
       });
-
       return;
     }
 
-    final stops = await _routeService.getStopsForRoute(route);
-    if (stops.length < 2) return;
-
-    _showAllStops(stops);
+    final destIds = _activeDestinations.map((e) => e.id).toSet();
+    setState(() {
+      _markers.clear();
+      for (final s in stops) {
+        _markers.add(
+          _createMarker(
+            s,
+            destIds.contains(s.id)
+                ? BitmapDescriptor.hueViolet
+                : BitmapDescriptor.hueRed,
+          ),
+        );
+      }
+      for (final d in _activeDestinations) {
+        _markers.add(_createMarker(d, BitmapDescriptor.hueGreen));
+      }
+    });
 
     final List<LatLng> full = [];
-
     for (int i = 0; i < stops.length - 1; i++) {
-      final part = await _getDrivingRoute(
-        LatLng(stops[i].lat, stops[i].lng),
-        LatLng(stops[i + 1].lat, stops[i + 1].lng),
+      full.addAll(
+        await _getDrivingRoute(
+          LatLng(stops[i].lat, stops[i].lng),
+          LatLng(stops[i + 1].lat, stops[i + 1].lng),
+        ),
       );
-      full.addAll(part);
     }
 
     setState(() {
-      _polylines.clear();
       _polylines.add(
         Polyline(
           polylineId: PolylineId(route.id),
@@ -314,15 +402,24 @@ class _MapScreenState extends State<MapScreen> {
     });
   }
 
-  Marker _createMarker(StopModel s, bool dest) => Marker(
-    markerId: MarkerId(s.id),
+  Marker _createMarker(StopModel s, double hue) => Marker(
+    markerId: MarkerId('${s.id}-$hue'),
     position: LatLng(s.lat, s.lng),
-    icon: BitmapDescriptor.defaultMarkerWithHue(
-      dest ? BitmapDescriptor.hueGreen : BitmapDescriptor.hueRed,
-    ),
+    infoWindow: InfoWindow(title: s.name),
+    icon: BitmapDescriptor.defaultMarkerWithHue(hue),
   );
 
-  // ================= UI =================
+  Future<void> _goHome() async {
+    if (_currentLocation == null || _mapController == null) return;
+    _mapController!.animateCamera(
+      CameraUpdate.newCameraPosition(
+        CameraPosition(target: _currentLocation!, zoom: 14),
+      ),
+    );
+  }
+
+  void _zoomIn() => _mapController?.animateCamera(CameraUpdate.zoomIn());
+  void _zoomOut() => _mapController?.animateCamera(CameraUpdate.zoomOut());
 
   @override
   Widget build(BuildContext context) {
@@ -331,7 +428,7 @@ class _MapScreenState extends State<MapScreen> {
         title: TextField(
           controller: _searchController,
           decoration: InputDecoration(
-            hintText: 'Search destination',
+            hintText: 'Search destinations (comma separated)',
             suffixIcon: IconButton(
               icon: const Icon(Icons.search),
               onPressed: _searchAndRecommend,
@@ -355,38 +452,118 @@ class _MapScreenState extends State<MapScreen> {
             bottom: 0,
             left: 0,
             right: 0,
-            height: 180,
-            child: Container(
-              color: Colors.white,
-              child: ListView.builder(
-                itemCount: _filteredRoutes.length,
-                itemBuilder: (_, i) {
-                  final r = _filteredRoutes[i];
-                  return ListTile(
-                    title: Row(
-                      children: [
-                        Text(r.name),
-                        if (i == 0)
-                          Container(
-                            margin: const EdgeInsets.only(left: 8),
-                            padding: const EdgeInsets.all(4),
-                            color: Colors.green,
-                            child: const Text(
-                              'BEST',
-                              style: TextStyle(color: Colors.white),
-                            ),
+            height: 220,
+            child: Column(
+              children: [
+                // Dropdown
+                Container(
+                  color: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 4,
+                  ),
+                  child: Row(
+                    children: [
+                      const Text('Sort by: '),
+                      DropdownButton<String>(
+                        value: _sortOption,
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'Distance',
+                            child: Text('Distance'),
                           ),
-                      ],
+                          DropdownMenuItem(value: 'Cost', child: Text('Cost')),
+                        ],
+                        onChanged: (value) {
+                          if (value != null) {
+                            setState(() {
+                              _sortOption = value;
+                              _sortRoutes();
+                            });
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: Container(
+                    color: Colors.white,
+                    child: ListView.builder(
+                      itemCount: _filteredRoutes.length,
+                      itemBuilder: (_, i) {
+                        final r = _filteredRoutes[i];
+                        final isBest = r.id == _bestRouteId;
+                        final fares = _routeFares[r.id] ?? {};
+                        final fareText = fares.entries
+                            .map((e) => '${e.key}: Rs.${e.value}')
+                            .join(', ');
+
+                        return ListTile(
+                          title: Row(
+                            children: [
+                              Text(r.name),
+                              if (isBest)
+                                Container(
+                                  margin: const EdgeInsets.only(left: 8),
+                                  padding: const EdgeInsets.all(4),
+                                  color: Colors.green,
+                                  child: const Text(
+                                    "BEST",
+                                    style: TextStyle(color: Colors.white),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          subtitle: Text(
+                            '${r.vehicle}${fareText.isNotEmpty ? ' - $fareText' : ''}',
+                          ),
+                          onTap: () => _showRoute(r),
+                        );
+                      },
                     ),
-                    subtitle: Text(r.vehicle),
-                    onTap: () => _showRoute(r),
-                  );
-                },
-              ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Positioned(
+            bottom: 20,
+            right: 12,
+            child: Column(
+              children: [
+                FloatingActionButton(
+                  mini: true,
+                  heroTag: "home",
+                  onPressed: _goHome,
+                  child: const Icon(Icons.my_location),
+                ),
+                const SizedBox(height: 8),
+                FloatingActionButton(
+                  mini: true,
+                  heroTag: "zoomIn",
+                  onPressed: _zoomIn,
+                  child: const Icon(Icons.add),
+                ),
+                const SizedBox(height: 8),
+                FloatingActionButton(
+                  mini: true,
+                  heroTag: "zoomOut",
+                  onPressed: _zoomOut,
+                  child: const Icon(Icons.remove),
+                ),
+              ],
             ),
           ),
         ],
       ),
     );
   }
+}
+
+class WalkingResult {
+  final double distanceMeters;
+  final int durationSeconds;
+  final List<LatLng> points;
+  WalkingResult(this.distanceMeters, this.durationSeconds, this.points);
 }
