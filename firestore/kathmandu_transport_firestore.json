@@ -79,13 +79,26 @@
     "Tinkune": { "name": "Tinkune", "lat": 27.6885, "lng": 85.345 },
     "Tinkuney": { "name": "Tinkuney", "lat": 27.6885, "lng": 85.345 },
 
-    "Tripureshwor": { "name": "Tripureshwor", "lat": 27.7068, "lng": 85.315 }
-  },
+    "Tripureshwor": { "name": "Tripureshwor", "lat": 27.7068, "lng": 85.315 },
+     "Gwarko_Chowk": { "name": "Gwarko Chowk", "lat": 27.6665, "lng": 85.334 },
+  "Lamatar_Bus_Stopn": { "name": "Lamatar Bus Stop", "lat": 27.648, "lng": 85.348 },
+  "Chapagaun": { "name": "Chapagaun", "lat": 27.633, "lng": 85.287 },
+  "Bajra_Barahi_Temple_Stop": { "name": "Bajra Barahi Temple Stop", "lat": 27.632, "lng": 85.289 },
+  "Tutepani": { "name": "Tutepani", "lat": 27.635, "lng": 85.300 },
+  "Kuamaripati": { "name": "Kuamaripati", "lat": 27.667, "lng": 85.322 },
+  "Nakhu": { "name": "Nakhu", "lat": 27.674, "lng": 85.319 },
+  "Sainbu": { "name": "Sainbu", "lat": 27.657, "lng": 85.320 },
+  "Khokana": { "name": "Khokana", "lat": 27.630, "lng": 85.301 },
+  "Chhampi": { "name": "Chhampi", "lat": 27.610, "lng": 85.330 },
+  "Dukuchhap": { "name": "Dukuchhap", "lat": 27.615, "lng": 85.335 },
+  "Tikabhairab": { "name": "Tikabhairab", "lat": 27.605, "lng": 85.345 }
+},
 
   "routes": {
     "route_1": {
+      "id":"1",
       "name":"Lagankhel- Gongabu",
-      "vehicleType": "sajha",
+      "vehicle": "sajha",
       "stopIds": [
         "Lagankhel","Kumaripati","Jawalakhel","Pulchowk","Harihar_Bhawan",
         "Kupondole","Tripureshwor","NAC","Jamal","Lainchaur",
@@ -94,8 +107,9 @@
     },
 
     "route_2": {
+       "id":"2",
         "name":"Lagankhel- Budhanilkantha",
-      "vehicleType": "sajha",
+      "vehicle": "sajha",
       "stopIds": [
         "Lagankhel","Kumaripati","Jawalakhel","Pulchowk","Harihar_Bhawan",
         "Kupondole","Tripureshwor","NAC","Jamal",
@@ -105,8 +119,9 @@
     },
 
     "route_3": {
+       "id":"3",
         "name":"Goddawari-Ratnapark",
-      "vehicleType": "sajha",
+      "vehicle": "sajha",
       "stopIds": [
         "Godawari","Hadegaun","Badegaun","Harishidhi","Hattiban",
         "Khumaltar","Satdobato","Lagankhel","Kumaripati",
@@ -116,8 +131,9 @@
     },
 
     "route_4": {
+       "id":"4",
         "name":"Thankot- TIA",
-      "vehicleType": "sajha",
+      "vehicle": "sajha",
       "stopIds": [
         "Thankot","Kalanki","Kalimati","Tripureshwor","NAC",
         "Ratnapark","Singhadurbar","Maitighar",
@@ -126,8 +142,9 @@
     },
 
     "route_5": {
+       "id":"5",
         "name":"Bungamati- Jamal",
-      "vehicleType": "sajha",
+      "vehicle": "sajha",
       "stopIds": [
         "Bungamati","Bhaisepati","Ekantakunna","Lagankhel",
         "Jawalakhel","Pulchowk","Kupondole",
@@ -136,8 +153,9 @@
     },
 
     "route_6": {
+       "id":"6",
         "name":"Imadol- Sundhara",
-      "vehicleType": "tempo",
+      "vehicle": "tempo",
       "stopIds": [
         "Imadol","Kamal_Pokhari","Krishna_Mandir_Chowk",
         "Gwarko","Mangal_Bazar","Lagankhel",
@@ -148,8 +166,9 @@
     },
 
     "route_7": {
+       "id":"7",
         "name":"Kumaripati-Lagankhel",
-      "vehicleType": "tempo",
+      "vehicle": "tempo",
       "stopIds": [
         "Kumaripati","Jawalakhel","Pulchowk","Harihar_Bhawan",
         "Kupondole","Maitighar","Naya_Baneshwor",
@@ -158,12 +177,63 @@
     },
 
     "route_8": {
+       "id":"8",
         "name":"Kumaripati- Bhadrakali",
-      "vehicleType": "tempo",
+      "vehicle": "tempo",
       "stopIds": [
         "Kumaripati","Jawalakhel","Pulchowk",
         "Kupondole","Kalimati","Tripureshwor","Bhadrakali"
       ]
+    },
+   "route9": {
+      "id":"9",
+      "name": "Lagankhel - Lamatar",
+      "vehicle": "bus",
+      "stopIds": [
+        "lagankhel",
+        "gwarko_chowk",
+        "imadol_bus_stop",
+        "tikathali",
+        "siddhipur",
+        "lubhu_bus_stop",
+        "lamatar_bus_stopn"
+      ]
+    },
+    "route10":{
+      "id":"10",
+      "name": "Lagankhel - Chapagaun",
+      "vehicle": "bus",
+      "stopIds": [
+        "chapagaun",
+        "bajra_barahi_temple_stop",
+        "tutepani",
+        "satdobato",
+        "lalitpur_industrial_estate",
+        "batuk_bhairav",
+        "lagankhel"
+      ]
+    },
+    "route11": {
+     "id":"11",
+      "name": "Lagankhel - Tikabhairab",
+      "vehicle": "bus",
+      "stopIds": [
+        "lagankhel",
+        "kuamaripati",
+        "jawalakhel",
+        "ekantakuna",
+        "nakhu",
+        "bhaisepati",
+        "sainbu",
+        "khokana",
+        "bungamati",
+        "godawari",
+        "chhampi",
+        "dukuchhap",
+        "tikabhairab"
+      ]
     }
+
+
   }
 }
