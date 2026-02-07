@@ -90,4 +90,5 @@ class DefaultFirebaseOptions {
     storageBucket: 'kungadi-53b2a.firebasestorage.app',
     measurementId: 'G-NWXK2F9D6J',
   );
+
 }

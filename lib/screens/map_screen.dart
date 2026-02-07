@@ -161,6 +161,8 @@ class _MapScreenState extends State<MapScreen> {
     });
   }
 
+  // ---------- FIXED BEST ROUTE LOGIC ----------
+
   Future<void> _calculateBestRoute() async {
     if (_currentLocation == null) return;
 
@@ -168,6 +170,7 @@ class _MapScreenState extends State<MapScreen> {
     String? bestId;
     Map<String, double> routeDistances = {};
 
+    // Precompute nearest stop distance for each route
     for (final r in _filteredRoutes) {
       final stops = await _routeService.getStopsForRoute(r);
       double nearestStopDistance = double.infinity;
@@ -191,15 +194,15 @@ class _MapScreenState extends State<MapScreen> {
     if (walkDist != null && walkDist <= bestDistance) {
       _bestRouteId = 'walk';
     } else {
-      bestId != null ? _bestRouteId = bestId : null;
+      _bestRouteId = bestId;
     }
 
-    _sortRoutes(); // apply sorting
+    _sortRoutes(routeDistances); // pass distances for sorting
 
     setState(() {});
   }
 
-  void _sortRoutes() {
+  void _sortRoutes([Map<String, double>? precomputedDistances]) {
     if (_sortOption == 'Cost') {
       _filteredRoutes.sort((a, b) {
         if (a.id == 'walk') return 1;
@@ -212,41 +215,19 @@ class _MapScreenState extends State<MapScreen> {
       });
       if (_filteredRoutes.isNotEmpty) _bestRouteId = _filteredRoutes.first.id;
     } else if (_sortOption == 'Distance') {
-      // distance from current location to nearest stop
       _filteredRoutes.sort((a, b) {
         if (_currentLocation == null) return 0;
-        if (a.id == 'walk') return -1;
-        if (b.id == 'walk') return 1;
-        double aDist = 0, bDist = 0;
-        _routeService.getStopsForRoute(a).then((stops) {
-          aDist = stops
-              .map(
-                (s) => Geolocator.distanceBetween(
-                  _currentLocation!.latitude,
-                  _currentLocation!.longitude,
-                  s.lat,
-                  s.lng,
-                ),
-              )
-              .reduce((v, e) => v < e ? v : e);
-        });
-        _routeService.getStopsForRoute(b).then((stops) {
-          bDist = stops
-              .map(
-                (s) => Geolocator.distanceBetween(
-                  _currentLocation!.latitude,
-                  _currentLocation!.longitude,
-                  s.lat,
-                  s.lng,
-                ),
-              )
-              .reduce((v, e) => v < e ? v : e);
-        });
+        if (a.id == 'walk') return 1; // walk last
+        if (b.id == 'walk') return -1;
+        final aDist = precomputedDistances?[a.id] ?? double.infinity;
+        final bDist = precomputedDistances?[b.id] ?? double.infinity;
         return aDist.compareTo(bDist);
       });
       if (_filteredRoutes.isNotEmpty) _bestRouteId = _filteredRoutes.first.id;
     }
   }
+
+  // ---------- END OF FIX ----------
 
   Future<double?> _getWalkingDistanceToNearestDestination() async {
     if (_currentLocation == null || _activeDestinations.isEmpty) return null;
