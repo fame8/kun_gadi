@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
-
 import '../models/route_model.dart';
 import '../models/stop_model.dart';
 import '../services/route_service.dart';
@@ -20,25 +19,23 @@ class MapScreen extends StatefulWidget {
 class _MapScreenState extends State<MapScreen> {
   final RouteService _routeService = RouteService();
   final TextEditingController _searchController = TextEditingController();
-
   GoogleMapController? _mapController;
-
   List<RouteModel> _routes = [];
   List<RouteModel> _filteredRoutes = [];
-
   final Set<Polyline> _polylines = {};
   final Set<Marker> _markers = {};
-
   List<StopModel> _activeDestinations = [];
   LatLng? _currentLocation;
-
   String? _bestRouteId;
   RouteModel? _walkRoute;
   int? _walkDurationMinutes;
-
   Map<String, Map<String, int>> _routeFares = {};
 
-  // New: sorting option
+  // New: Track walking times to nearest stops and total journey times
+  Map<String, int> _walkingTimesToNearestStop = {};
+  Map<String, int> _totalJourneyTimes = {};
+
+  // Updated sorting options
   String _sortOption = 'Distance'; // default
 
   @override
@@ -111,7 +108,6 @@ class _MapScreenState extends State<MapScreen> {
     final res = await http.get(Uri.parse(url));
     final data = jsonDecode(res.body);
     if (data['status'] != 'OK') return null;
-
     final leg = data['routes'][0]['legs'][0];
     return WalkingResult(
       leg['distance']['value'].toDouble(),
@@ -120,25 +116,145 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
+  // New: Geocoding function to get coordinates from place name
+  Future<LatLng?> _geocodePlace(String placeName) async {
+    final url =
+        'https://maps.googleapis.com/maps/api/geocode/json?address=${Uri.encodeComponent(placeName)}&key=$GOOGLE_API_KEY';
+    try {
+      final response = await http.get(Uri.parse(url));
+      final data = jsonDecode(response.body);
+
+      if (data['status'] == 'OK' && data['results'].isNotEmpty) {
+        final location = data['results'][0]['geometry']['location'];
+        return LatLng(location['lat'], location['lng']);
+      }
+    } catch (e) {
+      print('Geocoding error: $e');
+    }
+    return null;
+  }
+
+  // New: Find nearest stops to a location
+  Future<List<StopModel>> _findNearestStops(
+    LatLng location, {
+    double radiusMeters = 2000,
+  }) async {
+    final allStops = <StopModel>[];
+
+    // Get all stops from all routes
+    for (final route in _routes) {
+      final stops = await _routeService.getStopsForRoute(route);
+      allStops.addAll(stops);
+    }
+
+    // Remove duplicates based on stop ID
+    final uniqueStops = <String, StopModel>{};
+    for (final stop in allStops) {
+      uniqueStops[stop.id] = stop;
+    }
+
+    // Filter stops within radius and sort by distance
+    final nearbyStops = <StopWithDistance>[];
+    for (final stop in uniqueStops.values) {
+      final distance = Geolocator.distanceBetween(
+        location.latitude,
+        location.longitude,
+        stop.lat,
+        stop.lng,
+      );
+
+      if (distance <= radiusMeters) {
+        nearbyStops.add(StopWithDistance(stop, distance));
+      }
+    }
+
+    // Sort by distance and return stops
+    nearbyStops.sort((a, b) => a.distance.compareTo(b.distance));
+    return nearbyStops.map((swd) => swd.stop).toList();
+  }
+
   Future<void> _searchAndRecommend() async {
     final parts = _searchController.text
         .split(',')
         .map((e) => e.trim())
         .toList();
     final List<StopModel> found = [];
+    final List<StopModel> nearbyDestinations = [];
+
     for (final p in parts) {
+      // First, try to find exact matches in the database
       final s = await _routeService.searchStops(p);
-      if (s.isNotEmpty) found.add(s.first);
+
+      if (s.isNotEmpty) {
+        found.add(s.first);
+      } else {
+        // If not found in database, try geocoding and find nearest stops
+        final geocodedLocation = await _geocodePlace(p);
+        if (geocodedLocation != null) {
+          final nearestStops = await _findNearestStops(geocodedLocation);
+          if (nearestStops.isNotEmpty) {
+            // Create a virtual destination at the geocoded location
+            final virtualDestination = StopModel(
+              id: 'virtual_${DateTime.now().millisecondsSinceEpoch}',
+              name: p, // Use the search term as the name
+              lat: geocodedLocation.latitude,
+              lng: geocodedLocation.longitude,
+            );
+            nearbyDestinations.add(virtualDestination);
+
+            // Add the nearest actual stop as well for route finding
+            found.add(nearestStops.first);
+          }
+        }
+      }
     }
-    if (found.isEmpty) return;
 
-    _activeDestinations = found;
+    if (found.isEmpty && nearbyDestinations.isEmpty) {
+      // Show a message if nothing is found
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'No destinations or nearby routes found. Please try a different search term.',
+          ),
+          duration: Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
 
+    // Combine found destinations with nearby virtual destinations
+    _activeDestinations = [...found, ...nearbyDestinations];
+
+    // Find routes that serve the found stops (not virtual destinations)
     final matchingRoutes = _routes
-        .where((r) => found.every((s) => r.stopIds.contains(s.id)))
+        .where((r) => found.any((s) => r.stopIds.contains(s.id)))
         .toList();
 
-    _filteredRoutes = matchingRoutes.isEmpty ? _routes : matchingRoutes;
+    // If we have nearby destinations but no exact matches, find routes serving nearby stops
+    if (matchingRoutes.isEmpty && nearbyDestinations.isNotEmpty) {
+      final Set<String> nearbyRouteIds = {};
+      for (final virtualDest in nearbyDestinations) {
+        final nearbyStops = await _findNearestStops(
+          LatLng(virtualDest.lat, virtualDest.lng),
+          radiusMeters: 1000, // Smaller radius for route finding
+        );
+
+        for (final nearbyStop in nearbyStops.take(5)) {
+          // Consider top 5 nearest stops
+          for (final route in _routes) {
+            if (route.stopIds.contains(nearbyStop.id)) {
+              nearbyRouteIds.add(route.id);
+            }
+          }
+        }
+      }
+
+      _filteredRoutes = _routes
+          .where((r) => nearbyRouteIds.contains(r.id))
+          .toList();
+    } else {
+      _filteredRoutes = matchingRoutes.isEmpty ? _routes : matchingRoutes;
+    }
 
     await _calculateBestRoute();
     await _addWalkingOption();
@@ -151,29 +267,50 @@ class _MapScreenState extends State<MapScreen> {
       }
     }
 
-    _sortRoutes(); // sort according to selected option
+    _sortRoutes();
 
     setState(() {
       _markers.clear();
-      for (final d in found) {
+      // Add markers for all destinations (both exact matches and virtual ones)
+      for (final d in _activeDestinations) {
         _markers.add(_createMarker(d, BitmapDescriptor.hueGreen));
       }
     });
+
+    // Show info message if using nearby destinations
+    if (nearbyDestinations.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Showing routes near "${nearbyDestinations.map((d) => d.name).join(', ')}" - ${_filteredRoutes.length} routes found',
+          ),
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    }
   }
 
-  // ---------- FIXED BEST ROUTE LOGIC ----------
-
+  // Updated method to calculate walking times to nearest stops and total journey times
   Future<void> _calculateBestRoute() async {
     if (_currentLocation == null) return;
 
     double bestDistance = double.infinity;
+    int bestTotalTime = 999999;
     String? bestId;
     Map<String, double> routeDistances = {};
 
-    // Precompute nearest stop distance for each route
+    // Clear previous calculations
+    _walkingTimesToNearestStop.clear();
+    _totalJourneyTimes.clear();
+
+    // Calculate for each route
     for (final r in _filteredRoutes) {
       final stops = await _routeService.getStopsForRoute(r);
+
+      // Find nearest stop
+      StopModel? nearestStop;
       double nearestStopDistance = double.infinity;
+
       for (final s in stops) {
         final d = Geolocator.distanceBetween(
           _currentLocation!.latitude,
@@ -181,25 +318,114 @@ class _MapScreenState extends State<MapScreen> {
           s.lat,
           s.lng,
         );
-        if (d < nearestStopDistance) nearestStopDistance = d;
+        if (d < nearestStopDistance) {
+          nearestStopDistance = d;
+          nearestStop = s;
+        }
       }
+
       routeDistances[r.id] = nearestStopDistance;
+
+      // Calculate walking time to nearest stop
+      if (nearestStop != null) {
+        final walkToStop = await _getWalkingRoute(
+          _currentLocation!,
+          LatLng(nearestStop.lat, nearestStop.lng),
+        );
+
+        if (walkToStop != null) {
+          final walkMinutes = (walkToStop.durationSeconds / 60).round();
+          _walkingTimesToNearestStop[r.id] = walkMinutes;
+
+          // Estimate bus travel time (rough estimate: distance / average bus speed)
+          // Assuming average bus speed of 20 km/h in urban areas
+          double busDistanceToDestination = 0;
+          if (_activeDestinations.isNotEmpty) {
+            // Find the destination stop in route stops or nearest stop to virtual destination
+            StopModel? destStop;
+            for (final activeDestination in _activeDestinations) {
+              destStop = stops.firstWhere(
+                (stop) => stop.id == activeDestination.id,
+                orElse: () => _findNearestStopInRoute(stops, activeDestination),
+              );
+              if (destStop != null) break;
+            }
+
+            if (destStop != null) {
+              // Calculate approximate bus travel distance
+              busDistanceToDestination = Geolocator.distanceBetween(
+                nearestStop.lat,
+                nearestStop.lng,
+                destStop.lat,
+                destStop.lng,
+              );
+            }
+          }
+
+          // Estimate bus time (distance in meters / speed in m/s)
+          // 20 km/h = ~5.56 m/s
+          final busTimeMinutes = (busDistanceToDestination / (20 * 1000 / 60))
+              .round();
+          final totalTime =
+              walkMinutes + busTimeMinutes + 5; // +5 for waiting time
+
+          _totalJourneyTimes[r.id] = totalTime;
+
+          if (totalTime < bestTotalTime) {
+            bestTotalTime = totalTime;
+            bestId = r.id;
+          }
+        }
+      }
+
+      // For distance-based comparison (backup)
       if (nearestStopDistance < bestDistance) {
         bestDistance = nearestStopDistance;
-        bestId = r.id;
+        if (bestId == null) bestId = r.id;
       }
     }
 
+    // Compare with walking
     final walkDist = await _getWalkingDistanceToNearestDestination();
-    if (walkDist != null && walkDist <= bestDistance) {
-      _bestRouteId = 'walk';
+    if (walkDist != null && _walkDurationMinutes != null) {
+      _totalJourneyTimes['walk'] = _walkDurationMinutes!;
+
+      if (_walkDurationMinutes! <= bestTotalTime) {
+        _bestRouteId = 'walk';
+      } else {
+        _bestRouteId = bestId;
+      }
     } else {
       _bestRouteId = bestId;
     }
 
-    _sortRoutes(routeDistances); // pass distances for sorting
-
+    _sortRoutes(routeDistances);
     setState(() {});
+  }
+
+  // Helper method to find nearest stop in a route to a virtual destination
+  StopModel _findNearestStopInRoute(
+    List<StopModel> routeStops,
+    StopModel destination,
+  ) {
+    StopModel nearestStop = routeStops.first;
+    double nearestDistance = double.infinity;
+
+    for (final stop in routeStops) {
+      final distance = Geolocator.distanceBetween(
+        destination.lat,
+        destination.lng,
+        stop.lat,
+        stop.lng,
+      );
+
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearestStop = stop;
+      }
+    }
+
+    return nearestStop;
   }
 
   void _sortRoutes([Map<String, double>? precomputedDistances]) {
@@ -217,17 +443,28 @@ class _MapScreenState extends State<MapScreen> {
     } else if (_sortOption == 'Distance') {
       _filteredRoutes.sort((a, b) {
         if (_currentLocation == null) return 0;
-        if (a.id == 'walk') return 1; // walk last
+        if (a.id == 'walk') return 1;
         if (b.id == 'walk') return -1;
         final aDist = precomputedDistances?[a.id] ?? double.infinity;
         final bDist = precomputedDistances?[b.id] ?? double.infinity;
         return aDist.compareTo(bDist);
       });
       if (_filteredRoutes.isNotEmpty) _bestRouteId = _filteredRoutes.first.id;
+    } else if (_sortOption == 'Time') {
+      // New: Sort by total travel time
+      _filteredRoutes.sort((a, b) {
+        final aTime = _totalJourneyTimes[a.id] ?? 999999;
+        final bTime = _totalJourneyTimes[b.id] ?? 999999;
+        return aTime.compareTo(bTime);
+      });
+      if (_filteredRoutes.isNotEmpty) {
+        // Set best route based on shortest time
+        final shortestTime =
+            _totalJourneyTimes[_filteredRoutes.first.id] ?? 999999;
+        _bestRouteId = _filteredRoutes.first.id;
+      }
     }
   }
-
-  // ---------- END OF FIX ----------
 
   Future<double?> _getWalkingDistanceToNearestDestination() async {
     if (_currentLocation == null || _activeDestinations.isEmpty) return null;
@@ -436,7 +673,7 @@ class _MapScreenState extends State<MapScreen> {
             height: 220,
             child: Column(
               children: [
-                // Dropdown
+                // Updated Dropdown with Time option
                 Container(
                   color: Colors.white,
                   padding: const EdgeInsets.symmetric(
@@ -454,6 +691,7 @@ class _MapScreenState extends State<MapScreen> {
                             child: Text('Distance'),
                           ),
                           DropdownMenuItem(value: 'Cost', child: Text('Cost')),
+                          DropdownMenuItem(value: 'Time', child: Text('Time')),
                         ],
                         onChanged: (value) {
                           if (value != null) {
@@ -480,24 +718,51 @@ class _MapScreenState extends State<MapScreen> {
                             .map((e) => '${e.key}: Rs.${e.value}')
                             .join(', ');
 
+                        // Get timing information
+                        final walkToStopTime = _walkingTimesToNearestStop[r.id];
+                        final totalTime = _totalJourneyTimes[r.id];
+
+                        String timingInfo = '';
+                        if (r.id == 'walk') {
+                          timingInfo = totalTime != null
+                              ? ' - ${totalTime}min total'
+                              : '';
+                        } else {
+                          if (walkToStopTime != null && totalTime != null) {
+                            timingInfo =
+                                ' - ${walkToStopTime}min walk + ${totalTime - walkToStopTime - 5}min bus = ${totalTime}min total';
+                          }
+                        }
+
                         return ListTile(
                           title: Row(
                             children: [
-                              Text(r.name),
+                              Expanded(child: Text(r.name)),
                               if (isBest)
                                 Container(
                                   margin: const EdgeInsets.only(left: 8),
                                   padding: const EdgeInsets.all(4),
-                                  color: Colors.green,
+                                  decoration: BoxDecoration(
+                                    color: Colors.green,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
                                   child: const Text(
                                     "BEST",
-                                    style: TextStyle(color: Colors.white),
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                 ),
                             ],
                           ),
                           subtitle: Text(
-                            '${r.vehicle}${fareText.isNotEmpty ? ' - $fareText' : ''}',
+                            '${r.vehicle}${fareText.isNotEmpty ? ' - $fareText' : ''}$timingInfo',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[600],
+                            ),
                           ),
                           onTap: () => _showRoute(r),
                         );
@@ -546,5 +811,14 @@ class WalkingResult {
   final double distanceMeters;
   final int durationSeconds;
   final List<LatLng> points;
+
   WalkingResult(this.distanceMeters, this.durationSeconds, this.points);
+}
+
+// Helper class for storing stops with their distances
+class StopWithDistance {
+  final StopModel stop;
+  final double distance;
+
+  StopWithDistance(this.stop, this.distance);
 }
