@@ -1,67 +1,95 @@
+// import.js
 const admin = require("firebase-admin");
 const fs = require("fs");
 const path = require("path");
 
 // ------------------
-// Initialize Firebase Admin SDK
+// 1️⃣ Load service account
 // ------------------
-const serviceAccountPath = path.join(__dirname, "serviceAccountKey.json");
+let serviceAccountPath = path.join(__dirname, "serviceAccountKey.json");
 
+if (!fs.existsSync(serviceAccountPath)) {
+  console.error("❌ Service account file not found:", serviceAccountPath);
+  process.exit(1);
+}
+
+const serviceAccount = require(serviceAccountPath);
+
+// Initialize Firebase Admin
 admin.initializeApp({
-  credential: admin.credential.cert(serviceAccountPath),
+  credential: admin.credential.cert(serviceAccount),
 });
 
 const db = admin.firestore();
 
 // ------------------
-// Load JSON file
+// 2️⃣ Load JSON data
 // ------------------
-const jsonFilePath = path.join(__dirname, "kathmandu_transport_firestore.json");
-const data = JSON.parse(fs.readFileSync(jsonFilePath, "utf-8"));
+const dataPath = path.join(__dirname, "kathmandu_transport_firestore.json");
 
-async function importStops() {
-  const stops = data.stops || {};
-  console.log(`➡️ Importing ${Object.keys(stops).length} stops...`);
-
-  for (const key of Object.keys(stops)) {
-    const stop = stops[key];
-    await db.collection("stops").doc(key).set({
-      name: stop.name,
-      lat: stop.lat,
-      lng: stop.lng,
-    });
-    console.log(`✅ stops/${key}`);
-  }
+if (!fs.existsSync(dataPath)) {
+  console.error("❌ JSON data file not found:", dataPath);
+  process.exit(1);
 }
 
-async function importRoutes() {
-  const routes = data.routes || {};
-  console.log(`➡️ Importing ${Object.keys(routes).length} routes...`);
+const rawData = fs.readFileSync(dataPath);
+const data = JSON.parse(rawData);
 
-  for (const key of Object.keys(routes)) {
-    const route = routes[key];
-    await db.collection("routes").doc(key).set({
-      name: route.name,
-      vehicle: route.vehicle,
-      stopIds: route.stopIds,
-    });
-    console.log(`✅ routes/${key}`);
-  }
-}
-
-async function main() {
+// ------------------
+// 3️⃣ Import function
+// ------------------
+async function importData() {
   try {
-    console.log("🚀 Import script started");
+    // ---- Import Stops ----
+    const stops = data.stops;
+    console.log(`➡️ Importing ${Object.keys(stops).length} stops...`);
 
-    await importStops();
-    await importRoutes();
+    for (const stopId in stops) {
+      const stop = stops[stopId];
 
-    console.log("🎉 Import completed!");
+      // Remove undefined fields
+      Object.keys(stop).forEach((key) => {
+        if (stop[key] === undefined) delete stop[key];
+      });
+
+      await db.collection("stops").doc(stopId).set(stop);
+      console.log(`✅ Imported stop: ${stopId}`);
+    }
+
+    // ---- Import Routes ----
+    const routes = data.routes;
+    console.log(`➡️ Importing ${Object.keys(routes).length} routes...`);
+
+    for (const routeKey in routes) {
+      const route = routes[routeKey];
+
+      // Remove undefined fields
+      Object.keys(route).forEach((key) => {
+        if (route[key] === undefined) delete route[key];
+      });
+
+      // Use route.id as document ID
+      await db.collection("routes").doc(route.id).set(route);
+      console.log(`✅ Imported route: ${route.name}`);
+    }
+
+    // ---- Print all Stops ----
+    console.log("\n📄 All stops in Firestore:");
+    const stopsSnapshot = await db.collection("stops").get();
+    stopsSnapshot.forEach((doc) => console.log(doc.id, "=>", doc.data()));
+
+    // ---- Print all Routes ----
+    console.log("\n📄 All routes in Firestore:");
+    const routesSnapshot = await db.collection("routes").get();
+    routesSnapshot.forEach((doc) => console.log(doc.id, "=>", doc.data()));
+
+    console.log("\n🎉 Import complete!");
     process.exit(0);
-  } catch (err) {
-    console.error("❌ Import failed:", err);
+  } catch (error) {
+    console.error("❌ Import failed:", error);
     process.exit(1);
   }
 }
 
-main();
+// Run import
+importData();

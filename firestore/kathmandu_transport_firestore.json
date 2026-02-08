@@ -27,7 +27,6 @@
     "Hattigauda": { "name": "Hattigauda", "lat": 27.751, "lng": 85.333 },
 
     "Imadol": { "name": "Imadol", "lat": 27.653, "lng": 85.338 },
-    "Imadole": { "name": "Imadole", "lat": 27.653, "lng": 85.338 },
 
     "Jamal": { "name": "Jamal", "lat": 27.7102, "lng": 85.3115 },
     "Jawalakhel": { "name": "Jawalakhel", "lat": 27.6677, "lng": 85.3208 },
@@ -39,7 +38,6 @@
 
     "Khumaltar": { "name": "Khumaltar", "lat": 27.660, "lng": 85.330 },
     "Krishna_Mandir": { "name": "Krishna Mandir", "lat": 27.650, "lng": 85.340 },
-    "Krishna_Mandir_Chowk": { "name": "Krishna Mandir Chowk", "lat": 27.651, "lng": 85.341 },
 
     "Kumaripati": { "name": "Kumaripati", "lat": 27.6725, "lng": 85.3244 },
     "Kupondole": { "name": "Kupondole", "lat": 27.6864, "lng": 85.3095 },
@@ -80,8 +78,7 @@
     "Tinkuney": { "name": "Tinkuney", "lat": 27.6885, "lng": 85.345 },
 
     "Tripureshwor": { "name": "Tripureshwor", "lat": 27.7068, "lng": 85.315 },
-     "Gwarko_Chowk": { "name": "Gwarko Chowk", "lat": 27.6665, "lng": 85.334 },
-  "Lamatar_Bus_Stopn": { "name": "Lamatar Bus Stop", "lat": 27.648, "lng": 85.348 },
+  "Lamatar": { "name": "Lamatar", "lat": 27.648, "lng": 85.348 },
   "Chapagaun": { "name": "Chapagaun", "lat": 27.633, "lng": 85.287 },
   "Bajra_Barahi_Temple_Stop": { "name": "Bajra Barahi Temple Stop", "lat": 27.632, "lng": 85.289 },
   "Tutepani": { "name": "Tutepani", "lat": 27.635, "lng": 85.300 },
@@ -185,10 +182,11 @@
         "Kupondole","Kalimati","Tripureshwor","Bhadrakali"
       ]
     },
-   "route9": {
+
+    "route_9": {
       "id":"9",
       "name": "Lagankhel - Lamatar",
-      "vehicle": "bus",
+      "vehicle": "microbus",
       "stopIds": [
         "lagankhel",
         "gwarko_chowk",
@@ -199,10 +197,11 @@
         "lamatar_bus_stopn"
       ]
     },
-    "route10":{
+
+    "route_10":{
       "id":"10",
       "name": "Lagankhel - Chapagaun",
-      "vehicle": "bus",
+      "vehicle": "microbus",
       "stopIds": [
         "chapagaun",
         "bajra_barahi_temple_stop",
@@ -213,10 +212,11 @@
         "lagankhel"
       ]
     },
-    "route11": {
+
+    "route_11": {
      "id":"11",
       "name": "Lagankhel - Tikabhairab",
-      "vehicle": "bus",
+      "vehicle": "microbus",
       "stopIds": [
         "lagankhel",
         "kuamaripati",

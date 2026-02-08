@@ -11,6 +11,6 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "firebase-admin": "^13.6.0"
+    "firebase-admin": "^13.6.1"
   }
 }

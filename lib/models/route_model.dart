@@ -13,13 +13,12 @@ class RouteModel {
     this.cost,
   });
 
-  factory RouteModel.fromJson(Map<String, dynamic> json) {
+  factory RouteModel.fromFirestore(String id, Map<String, dynamic> data) {
     return RouteModel(
-      id: json['id'],
-      name: json['name'],
-      vehicle: json['vehicle'],
-      stopIds: List<String>.from(json['stopIds']),
-      cost: json['cost']?.toDouble(),
+      id: id,
+      name: data['name'] ?? 'Unnamed Route',
+      vehicle: data['vehicle'] ?? '',
+      stopIds: List<String>.from(data['stopIds'] ?? []),
     );
   }
 }

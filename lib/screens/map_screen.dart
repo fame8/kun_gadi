@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
@@ -17,6 +18,10 @@ class MapScreen extends StatefulWidget {
 }
 
 class _MapScreenState extends State<MapScreen> {
+  StreamSubscription<Position>? _livePositionStream;
+  LatLng? _liveDestination;
+  List<DirectionStep> _liveDirections = [];
+
   final RouteService _routeService = RouteService();
   final TextEditingController _searchController = TextEditingController();
   GoogleMapController? _mapController;
@@ -51,10 +56,84 @@ class _MapScreenState extends State<MapScreen> {
 
   Future<void> _loadRoutes() async {
     final r = await _routeService.getAllRoutes();
+
+    print("🔥 ROUTES FROM FIRESTORE: ${r.length}");
+    for (final route in r) {
+      print("➡️ ${route.id} ${route.name}");
+    }
+
     setState(() {
       _routes = r;
       _filteredRoutes = r;
     });
+  }
+
+  Future<List<DirectionStep>> _getWalkingSteps(
+    LatLng origin,
+    LatLng destination,
+  ) async {
+    final url =
+        'https://maps.googleapis.com/maps/api/directions/json'
+        '?origin=${origin.latitude},${origin.longitude}'
+        '&destination=${destination.latitude},${destination.longitude}'
+        '&mode=walking'
+        '&key=$GOOGLE_API_KEY';
+
+    final res = await http.get(Uri.parse(url));
+    final data = jsonDecode(res.body);
+
+    if (data['status'] != 'OK') return [];
+
+    final steps = data['routes'][0]['legs'][0]['steps'] as List;
+
+    return steps.map((s) {
+      final raw = s['html_instructions'] as String;
+      final clean = raw.replaceAll(RegExp(r'<[^>]*>'), '');
+
+      return DirectionStep(
+        instruction: clean,
+        distance: s['distance']['text'],
+        duration: s['duration']['text'],
+      );
+    }).toList();
+  }
+
+  void _startLiveDirections(LatLng destination) {
+    _liveDestination = destination;
+
+    _livePositionStream?.cancel();
+
+    _livePositionStream =
+        Geolocator.getPositionStream(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.best,
+            distanceFilter: 5,
+          ),
+        ).listen((pos) async {
+          final origin = LatLng(pos.latitude, pos.longitude);
+
+          final walk = await _getWalkingRoute(origin, destination);
+
+          if (walk == null) return;
+          final steps = await _getWalkingSteps(origin, destination);
+
+          setState(() {
+            _liveDirections = steps;
+          });
+
+          setState(() {
+            _polylines.removeWhere((p) => p.polylineId.value == 'live');
+
+            _polylines.add(
+              Polyline(
+                polylineId: const PolylineId('live'),
+                points: walk.points,
+                width: 6,
+                color: Colors.green,
+              ),
+            );
+          });
+        });
   }
 
   Future<void> _getLocation() async {
@@ -466,6 +545,23 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
+  void _showDirectionsSheet() {
+    showModalBottomSheet(
+      context: context,
+      builder: (_) => ListView.builder(
+        itemCount: _liveDirections.length,
+        itemBuilder: (_, i) {
+          final s = _liveDirections[i];
+          return ListTile(
+            leading: const Icon(Icons.directions_walk),
+            title: Text(s.instruction),
+            subtitle: Text('${s.distance} • ${s.duration}'),
+          );
+        },
+      ),
+    );
+  }
+
   Future<double?> _getWalkingDistanceToNearestDestination() async {
     if (_currentLocation == null || _activeDestinations.isEmpty) return null;
     final walk = await _getWalkingRoute(
@@ -536,6 +632,8 @@ class _MapScreenState extends State<MapScreen> {
     }
 
     if (route.id != 'walk' && nearestStop != null) {
+      _startLiveDirections(LatLng(nearestStop.lat, nearestStop.lng));
+
       final walk = await _getWalkingRoute(
         _currentLocation!,
         LatLng(nearestStop.lat, nearestStop.lng),
@@ -556,6 +654,10 @@ class _MapScreenState extends State<MapScreen> {
     }
 
     if (route.id == 'walk') {
+      _startLiveDirections(
+        LatLng(_activeDestinations.first.lat, _activeDestinations.first.lng),
+      );
+
       if (_activeDestinations.isEmpty) return;
       final walk = await _getWalkingRoute(
         _currentLocation!,
@@ -643,6 +745,13 @@ class _MapScreenState extends State<MapScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.directions),
+            onPressed: _showDirectionsSheet,
+          ),
+        ],
+
         title: TextField(
           controller: _searchController,
           decoration: InputDecoration(
@@ -805,6 +914,12 @@ class _MapScreenState extends State<MapScreen> {
       ),
     );
   }
+
+  @override
+  void dispose() {
+    _livePositionStream?.cancel();
+    super.dispose();
+  }
 }
 
 class WalkingResult {
@@ -821,4 +936,16 @@ class StopWithDistance {
   final double distance;
 
   StopWithDistance(this.stop, this.distance);
+}
+
+class DirectionStep {
+  final String instruction;
+  final String distance;
+  final String duration;
+
+  DirectionStep({
+    required this.instruction,
+    required this.distance,
+    required this.duration,
+  });
 }
