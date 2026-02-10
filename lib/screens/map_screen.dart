@@ -8,7 +8,7 @@ import '../models/route_model.dart';
 import '../models/stop_model.dart';
 import '../services/route_service.dart';
 
-const String GOOGLE_API_KEY = 'AIzaSyBVEoTUtT7P_OA2hRE-T-YbcOJtQLuprb4';
+const String GOOGLE_API_KEY = 'Your API key here';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
